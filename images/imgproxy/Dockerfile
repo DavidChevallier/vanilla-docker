@@ -1,1 +1,0 @@
-FROM darthsim/imgproxy:latest

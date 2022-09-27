@@ -24,3 +24,11 @@ _notes
 !/resources/usr/local/etc/php/conf.d/.gitkeep
 /resources/usr/local/etc/php/fpm/pool.d/
 !/resources/usr/local/etc/php/fpm/pool.d/www.conf
+
+
+## ignore my stuff
+.gitattributes
+.pre-commit-config.yaml
+.vscodeignore
+.yamllint
+.editorconfig

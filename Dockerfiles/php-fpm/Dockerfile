@@ -54,12 +54,12 @@ RUN apk update \
         oniguruma-dev \
         libmemcached-dev \
     && pecl clear-cache
-COPY ./conf/00-php.ini /usr/local/etc/php/conf.d/00-php.ini
-COPY ./conf/www.conf /usr/local/etc/php-fpm.d/www.conf
+COPY ./src/00-php.ini /usr/local/etc/php/conf.d/00-php.ini
+COPY ./src/www.conf /usr/local/etc/php-fpm.d/www.conf
 
-RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
-RUN touch /var/log/syslog
+RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf \
+&& touch /var/log/syslog
 
-COPY docker-entrypoint.sh /docker-entrypoint.sh
+COPY ./assets/entrypoint.sh /entrypoint.sh
 
-CMD ["/docker-entrypoint.sh"]
+CMD ["/entrypoint.sh"]

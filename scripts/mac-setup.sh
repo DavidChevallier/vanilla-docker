@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck shell=bash
 
 HOSTNAMES=(
     # Services
@@ -42,7 +43,7 @@ if [ ! -f "$CERTIFICATE_PATH2" ]; then
 fi
 
 # Allows us to use database as the hostname to connect to the database.
-for HOSTNAME in ${HOSTNAMES[@]}; do
+for HOSTNAME in "${HOSTNAMES[@]}"; do
     HOST_ENTRY=$(grep ^"$HOSTNAME" /etc/hosts);
     if [ ! -n "$HOST_ENTRY" ]; then
         echo '127.0.0.1 '"$HOSTNAME" \# Added from vanilla-docker/mac-setup.sh >> /etc/hosts

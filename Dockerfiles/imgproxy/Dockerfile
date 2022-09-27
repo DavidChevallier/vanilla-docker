@@ -1,0 +1,1 @@
+FROM darthsim/imgproxy:v3.7.2
