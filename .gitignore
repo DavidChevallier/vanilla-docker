@@ -32,3 +32,4 @@ _notes
 .vscodeignore
 .yamllint
 .editorconfig
+Dockerfiles/percona/tmp.Dockerfile

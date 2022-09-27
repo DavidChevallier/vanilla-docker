@@ -1,73 +1,116 @@
 version: '3.8'
 
-services:
-  database:
-    platform: 'linux/amd64'
-    build:
-      context: './images/database'
-    container_name: 'database'
-    environment:
-      MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
-      MYSQL_DATABASE: vanilla_dev
-    networks:
-      - 'vanilla_network'
-    ports:
-      - '3306:3306'
-    volumes:
-      - './logs/database:/var/log/mysql:delegated'
-      - './resources/etc/mysql/conf.d/:/etc/mysql/conf.d/'
-      - 'datastorage:/var/lib/mysql'
+volumes:
+  datastorage:
+    driver: local
+    external: false
+#  hz-volume:
+#    driver: local
+#    driver: hetzner
+#    driver_opts:
+#      prefix: ''
+#      size: '10'
+#      fstype: ext4
 
-  ## Put the following in conf/bootstrap.early.php
-  #    // Cache
-  #    saveToConfig('Cache.Enabled', true); # Toggle this to true/false to enable/disable caching.
-  #    saveToConfig('Cache.Method', 'memcached');
-  #    saveToConfig('Cache.Memcached.Store', ['memcached:11211']);
-  #
-  #    if (c('Cache.Enabled')) {
-  #        if (class_exists('Memcached')) {
-  #            saveToConfig('Cache.Memcached.Option.'.Memcached::OPT_COMPRESSION, true, false);
-  #            saveToConfig('Cache.Memcached.Option.'.Memcached::OPT_DISTRIBUTION, Memcached::DISTRIBUTION_CONSISTENT, false);
-  #            saveToConfig('Cache.Memcached.Option.'.Memcached::OPT_LIBKETAMA_COMPATIBLE, true, false);
-  #            saveToConfig('Cache.Memcached.Option.'.Memcached::OPT_NO_BLOCK, true, false);
-  #            saveToConfig('Cache.Memcached.Option.'.Memcached::OPT_TCP_NODELAY, true, false);
-  #            saveToConfig('Cache.Memcached.Option.'.Memcached::OPT_CONNECT_TIMEOUT, 1000, false);
-  #            saveToConfig('Cache.Memcached.Option.'.Memcached::OPT_SERVER_FAILURE_LIMIT, 2, false);
-  #        } else {
-  #            die('PHP is missing the Memcached extension.');
-  #        }
-  #    }
-  #####
-  memcached:
-    image: memcached:1.5-alpine
-    container_name: memcached
-#    build:
-#      context: './images/memcached'
-    networks:
-      - 'vanilla_network'
+networks:
+  frontend:
+    name: frontend
+    driver: 'bridge'
+    external: true
+  backend:
+    name: backend
+    external: false
+
+services:
+  traefik:
+    image: traefik:v2.9
+    hostname: traefik.${DOMAIN}
+    container_name: traefik.${DOMAIN}
+    restart: 'unless-stopped'
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.swarmMode=false"
+      - "--log.level=INFO"
+      - "--ping=true"
+      - "--ping.entrypoint=web"
+      - "--entryPoints.ping.address=:8082"
+      - "--entryPoints.web.address=prometheus@docker:9090"
+      - "--metrics.prometheus.entryPoint=metrics"
+      - "--ping.entryPoint=ping"
+      - "--metrics=true"
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
+      - "--entrypoints.web.address=:80"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
+      - "--global.sendAnonymousUsage"
+      - "--accesslog=true"
+      - "--tracing=true"
+      - "--tracing.jaeger=true"
+      - "--tracing.jaeger.samplingType=const"
+      - "--tracing.jaeger.samplingParam=1.0"
+      - "--tracing.jaeger.localAgentHostPort=jaeger:6831"
+      - "--tracing.spanNameLimit=150"
+    environment:
+      TZ: ${TZ}
+#      PUID: ${PUID}
+#      PGID: ${PGID}
+#      DOMAIN: ${DOMAIN}
+#      CLOUDFLARE_EMAIL: ${CLOUDFLARE_EMAIL}
+#      CLOUDFLARE_API_KEY: ${CLOUDFLARE_API_KEY}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      #- ${DATA}/${CONFIG}/traefik:/etc/traefik/
+      #- ${DATA}/${APPDATA}/traefik/acme:/etc/traefik/acme
+      #- ${DATA}/${APPDATA}/traefik/shared:/shared
+      #- ${DATA}/${LOGS}:/var/log
     ports:
-      - '11211:11211'
+      - "80:80/tcp"
+      - "443:443/tcp"
+#      - "8080:8080/tcp"
+#      - "8082:8082/tcp"
+    networks:
+      - ${EXTERNAL_NETWORK}
+      - ${INTERNAL_NETWORK}
 
   nginx:
+    image: docker.io/dchevallier/nginx:v1.0.0
+    hostname: nginx.${DOMAIN}
+    container_name: nginx.${DOMAIN}
     build:
-      context: './images/nginx'
-    # Transform the template into an actual file
+      context: './Dockerfiles/nginx'
     command: /bin/ash -c "envsubst < /etc/nginx/fastcgi.conf.tpl > /etc/nginx/fastcgi.conf && nginx -g 'daemon off;'"
-    container_name: 'nginx'
-    depends_on:
-      - 'php-fpm'
     environment:
-      - 'DOLLAR=$$'
-      - 'FASTCGI_SPLIT_PATH_INFO=${VANILLA_DOCKER_FASTCGI_SPLIT_PATH_INFO}'
-      - 'FASTCGI_INTERCEPT_ERRORS=${VANILLA_DOCKER_FASTCGI_INTERCEPT_ERRORS}'
-      - 'FASTCGI_IGNORE_CLIENT_ABORT=${VANILLA_DOCKER_FASTCGI_IGNORE_CLIENT_ABORT}'
-      - 'FASTCGI_CONNECT_TIMEOUT=${VANILLA_DOCKER_FASTCGI_CONNECT_TIMEOUT}'
-      - 'FASTCGI_SEND_TIMEOUT=${VANILLA_DOCKER_FASTCGI_SEND_TIMEOUT}'
-      - 'FASTCGI_READ_TIMEOUT=${VANILLA_DOCKER_FASTCGI_READ_TIMEOUT}'
-      - 'FASTCGI_BUFFER_SIZE=${VANILLA_DOCKER_FASTCGI_BUFFER_SIZE}'
-      - 'FASTCGI_BUFFERS=${VANILLA_DOCKER_FASTCGI_BUFFERS}'
-      - 'FASTCGI_BUSY_BUFFERS_SIZE=${VANILLA_DOCKER_FASTCGI_BUSY_BUFFERS_SIZE}'
-      - 'FASTCGI_TEMP_FILE_WRITE_SIZE=${VANILLA_DOCKER_FASTCGI_TEMP_FILE_WRITE_SIZE}'
+      TZ: ${TZ}
+      DOLLAR: '$$'
+      FASTCGI_SPLIT_PATH_INFO: ${VANILLA_DOCKER_FASTCGI_SPLIT_PATH_INFO}'
+      FASTCGI_INTERCEPT_ERRORS: ${VANILLA_DOCKER_FASTCGI_INTERCEPT_ERRORS}'
+      FASTCGI_IGNORE_CLIENT_ABORT: ${VANILLA_DOCKER_FASTCGI_IGNORE_CLIENT_ABORT}'
+      FASTCGI_CONNECT_TIMEOUT: ${VANILLA_DOCKER_FASTCGI_CONNECT_TIMEOUT}'
+      FASTCGI_SEND_TIMEOUT: ${VANILLA_DOCKER_FASTCGI_SEND_TIMEOUT}'
+      FASTCGI_READ_TIMEOUT: ${VANILLA_DOCKER_FASTCGI_READ_TIMEOUT}'
+      FASTCGI_BUFFER_SIZE: ${VANILLA_DOCKER_FASTCGI_BUFFER_SIZE}'
+      FASTCGI_BUFFERS: ${VANILLA_DOCKER_FASTCGI_BUFFERS}'
+      FASTCGI_BUSY_BUFFERS_SIZE: ${VANILLA_DOCKER_FASTCGI_BUSY_BUFFERS_SIZE}'
+      FASTCGI_TEMP_FILE_WRITE_SIZE: ${VANILLA_DOCKER_FASTCGI_TEMP_FILE_WRITE_SIZE}'
+    labels:
+        - "traefik.port=80"
+        - "traefik.enable=true"
+        - "traefik.http.routers.nginx.rule=Host(`nginx.${DOMAIN}`)"
+        - "traefik.http.routers.nginx.entrypoints=web"
+        - "com.centurylinklabs.watchtower.enable=true"
+    volumes:
+      - ./logs/nginx:/var/log/nginx:delegated
+      - ./resources/certificates:/certificates:cached
+      - ./resources/etc/nginx/conf.d:/etc/nginx/conf.d:cached
+      - ./resources/etc/nginx/sites-available:/etc/nginx/sites-available:cached
+      - ./resources/etc/nginx/sites-enabled:/etc/nginx/sites-enabled:cached
+      - ../:/srv/vanilla-repositories:cached
+    ports:
+      - '80:80'
+      - '8080:8080'
+      - '443:443'
     networks:
       vanilla_network:
         aliases: # Allows (sso|dev).vanilla.localhost to be resolved internally from php-fpm
@@ -75,62 +118,118 @@ services:
           - 'dev.vanilla.localhost'
           - 'vanilla.test'
           - 'vanilla.localhost'
-    ports:
-      - '80:80'
-      - '8080:8080'
-      - '443:443'
-    volumes:
-      - './logs/nginx:/var/log/nginx:delegated'
-      - './resources/certificates:/certificates:cached'
-      - './resources/etc/nginx/conf.d:/etc/nginx/conf.d:cached'
-      - './resources/etc/nginx/sites-available:/etc/nginx/sites-available:cached'
-      - './resources/etc/nginx/sites-enabled:/etc/nginx/sites-enabled:cached'
-      - '../:/srv/vanilla-repositories:cached'
 
-  # Don't forget to update docker-compose.unit-test.yml
-  php-fpm:
+  percona:
+    image: docker.io/dchevallier/percona:v1.0.0
+    platform: linux/amd64
+    hostname: percona.${DOMAIN}
+    container_name: percona.${DOMAIN}
+    restart: 'unless-stopped'
     build:
-      context: './images/php-fpm'
-    container_name: 'php-fpm'
-    depends_on:
-      - 'database'
-    networks: &php-networks
-      - 'vanilla_network'
-    volumes: &php-volumes
-      - './logs/php-syslog:/var/log:delegated'
-      - './logs/php-fpm:/var/log/php-fpm:delegated'
-      - './resources/certificates:/usr/local/share/ca-certificates:cached' # Mount extra certificates
-      - '../:/srv/vanilla-repositories:cached'
-  php-fpm-xdebug:
-    build:
-      context: './images/php-fpm'
-    container_name: 'php-fpm-xdebug'
+      context: './Dockerfiles/database'
     environment:
-      - 'PHP_DEBUG=on'
-    networks: *php-networks
-    volumes: *php-volumes
-
-  #https://docs.imgproxy.net/
-  imgproxy:
-    build:
-      context: './images/imgproxy'
-    container_name: 'imgproxy'
+      TZ: ${TZ}
+      MYSQL_ALLOW_EMPTY_PASSWORD: yes
+      MYSQL_DATABASE: vanilla_dev
+    labels:
+        - "traefik.port=80"
+        - "traefik.enable=true"
+        - "traefik.http.routers.percona.rule=Host(`percona.${DOMAIN}`)"
+        - "traefik.http.routers.percona.entrypoints=web"
+        - "com.centurylinklabs.watchtower.enable=true"
+    volumes:
+      - './logs/database:/var/log/mysql:delegated'
+      - './resources/etc/mysql/conf.d/:/etc/mysql/conf.d/'
+      - 'datastorage:/var/lib/mysql'
+    ports:
+      - '3306:3306'
     networks:
-      - 'vanilla_network'
+      - ${INTERNAL_NETWORK}
+
+  memcached:
+    image: docker.io/dchevallier/memcached:1.5-alpine
+    hostname: memcached.${DOMAIN}
+    container_name: memcached.${DOMAIN}
+    build:
+      context: './Dockerfiles/memcached'
+    restart: 'unless-stopped'
+    environment:
+      TZ: ${TZ}
+    labels:
+        - "traefik.port=80"
+        - "traefik.enable=true"
+        - "traefik.http.routers.memcached.rule=Host(`memcached.${DOMAIN}`)"
+        - "traefik.http.routers.memcached.entrypoints=web"
+        - "com.centurylinklabs.watchtower.enable=true"
+    ports:
+      - '11211:11211'
+    networks:
+      - ${INTERNAL_NETWORK}
+
+
+  php-fpm:
+    image: docker.io/dchevallier/php-fpm:v0.0.1
+    hostname: php-fpm.${DOMAIN}
+    container_name: php-fpm.${DOMAIN}
+    build:
+      context: './Dockerfiles/php-fpm'
+    restart: 'unless-stopped'
+    environment:
+      TZ: ${TZ}
+    labels:
+        - "traefik.port=80"
+        - "traefik.enable=true"
+        - "traefik.http.routers.php-fpm.rule=Host(`php-fpm.${DOMAIN}`)"
+        - "traefik.http.routers.php-fpm.entrypoints=web"
+        - "com.centurylinklabs.watchtower.enable=true"
+    volumes: &php-volumes
+      - ./logs/php-syslog:/var/log:delegated
+      - ./logs/php-fpm:/var/log/php-fpm:delegated
+      - ./resources/certificates:/usr/local/share/ca-certificates:cached
+      - ../:/srv/vanilla-repositories:cached
+    networks: &php-networks
+      - '${INTERNAL_NETWORK}'
+
+  php-fpm-xdebug:
+    image: docker.io/dchevallier/php-fpm:v1.0.0
+    hostname: php-fpm-xdebug.${DOMAIN}
+    container_name: php-fpm-xdebug.${DOMAIN}
+    build:
+      context: './Dockerfiles/php-fpm'
+    restart: 'unless-stopped'
+    environment:
+      TZ: ${TZ}
+      PHP_DEBUG: on
+    labels:
+        - "traefik.port=80"
+        - "traefik.enable=true"
+        - "traefik.http.routers.php-fpm-xdebug.rule=Host(`php-fpm-xdebug.${DOMAIN}`)"
+        - "traefik.http.routers.php-fpm-xdebug.entrypoints=web"
+        - "com.centurylinklabs.watchtower.enable=true"
+    volumes: *php-volumes
+    networks: *php-networks
+
+  imgproxy:
+    image: docker.io/dchevallier/imgproxy:v1.0.0
+    hostname: imgproxy.${DOMAIN}
+    container_name: imgproxy.${DOMAIN}
+    build:
+      context: './Dockerfiles/imgproxy'
+    restart: 'unless-stopped'
+    environment:
+      TZ: ${TZ}
+      IMGPROXY_IGNORE_SSL_VERIFICATION: ${IMGPROXY_IGNORE_SSL_VERIFICATION}'
+      IMGPROXY_KEY: ${IMGPROXY_KEY}'
+      IMGPROXY_SALT: ${IMGPROXY_SALT}'
+      IMGPROXY_SIGNATURE: ${IMGPROXY_SIGNATURE}'
+    labels:
+        - "traefik.port=80"
+        - "traefik.enable=true"
+        - "traefik.http.routers.imgproxy.rule=Host(`imgproxy.${DOMAIN}`)"
+        - "traefik.http.routers.imgproxy.entrypoints=web"
+        - "com.centurylinklabs.watchtower.enable=true"
     ports:
       - '8600:8080'
-    environment:
-      - 'IMGPROXY_IGNORE_SSL_VERIFICATION=${IMGPROXY_IGNORE_SSL_VERIFICATION}'
-      - 'IMGPROXY_KEY=${IMGPROXY_KEY}'
-      - 'IMGPROXY_SALT=${IMGPROXY_SALT}'
-      - 'IMGPROXY_SIGNATURE=${IMGPROXY_SIGNATURE}'
+    networks:
+      - 'vanilla_network'
 
-volumes:
-  datastorage:
-    # Created by our setup script.
-    external: true
-
-networks:
-  vanilla_network:
-    driver: 'bridge'
-    name: 'vanilla_network'
