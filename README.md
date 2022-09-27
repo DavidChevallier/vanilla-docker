@@ -1,10 +1,23 @@
-## Vanilla Docker environment
+# Vanilla Docker environment
 
-*Only supports Mac OSX at the moment but everything can be easily adapted to work on other platforms.*
-*Assume that you are using [PhpStorm](https://www.jetbrains.com/phpstorm/) as your IDE.*
+_Only supports Mac OSX at the moment but everything can be easily adapted to work on other platforms._
+_Assume that you are using [PhpStorm](https://www.jetbrains.com/phpstorm/) as your IDE._
 
 This repository contains a ready-for-development environment to develop against Vanilla.
 
+## Table of Content
+
+- [Vanilla Docker environment](#vanilla-docker-environment)
+  - [Table of Content](#table-of-content)
+  - [The containers](#the-containers)
+    - [database](#database)
+    - [httpd](#httpd)
+    - [nginx](#nginx)
+    - [php-fpm](#php-fpm)
+  - [Setup](#setup)
+    - [Xdebug](#xdebug)
+    - [Unit tests](#unit-tests)
+  - [F.A.Q](#faq)
 ## The containers
 
 ### database
@@ -27,12 +40,12 @@ Apache 2 web server.
 nginx web server
 
 - Serve:
-    - https://dev.vanilla.localhost (main forum)
-    - https://vanilla.localhost/dev (directory-based main forum, see [the docs](docs/vanilla-localhost-dirs.md))
-    - https://sso.vanilla.localhost ([stub-sso-providers](https://github.com/vanilla/stub-sso-providers))
-    - https://embed.vanilla.localhost ([stub-embed-providers](https://github.com/vanilla/stub-embed-providers))
-    - https://advanced-embed.vanilla.localhost ([stub-embed-providers](https://github.com/vanilla/stub-embed-providers))
-    - http://vanilla.test:8080 (unit tests address)
+  - https://dev.vanilla.localhost (main forum)
+  - https://vanilla.localhost/dev (directory-based main forum, see [the docs](docs/vanilla-localhost-dirs.md))
+  - https://sso.vanilla.localhost ([stub-sso-providers](https://github.com/vanilla/stub-sso-providers))
+  - https://embed.vanilla.localhost ([stub-embed-providers](https://github.com/vanilla/stub-embed-providers))
+  - https://advanced-embed.vanilla.localhost ([stub-embed-providers](https://github.com/vanilla/stub-embed-providers))
+  - http://vanilla.test:8080 (unit tests address)
 
 ### php-fpm
 
@@ -45,7 +58,7 @@ The nginx container takes care of routing the request to the appropriate php-fpm
 
 ## Setup
 
-https://success.vanillaforums.com/kb/articles/155-local-setup-quickstart
+<https://success.vanillaforums.com/kb/articles/155-local-setup-quickstart>
 
 ### Xdebug
 
